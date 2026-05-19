@@ -7,6 +7,7 @@ import { GardenExplorer } from "@/components/social/GardenExplorer";
 import { GardenHeader } from "@/components/GardenHeader";
 import { GameInitializer } from "@/components/GameInitializer";
 import type { GardenLayout, Flower } from "@/types/database";
+import type { Grade } from "@/lib/words";
 
 type LayoutWithFlower = GardenLayout & { flowers: Flower | null };
 
@@ -15,11 +16,15 @@ export default async function GardenPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: layouts }, { data: inventory }, { data: flowers }] = await Promise.all([
+  const [{ data: layouts }, { data: inventory }, { data: flowers }, { data: profile }] = await Promise.all([
     supabase.from("garden_layouts").select("*, flowers(*)").eq("user_id", user.id),
     supabase.from("inventory").select("*").eq("user_id", user.id).single(),
     supabase.from("flowers").select("*").eq("is_discoverable", true).order("rarity"),
+    supabase.from("users").select("spelling_level").eq("id", user.id).single(),
   ]);
+
+  const rawLevel = (profile as { spelling_level?: number } | null)?.spelling_level ?? 5;
+  const grade = ([4, 5, 6, 7, 8].includes(rawLevel) ? rawLevel : 5) as Grade;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -27,6 +32,7 @@ export default async function GardenPage() {
       <GameInitializer
         inventory={inventory ?? null}
         layouts={(layouts as LayoutWithFlower[]) ?? []}
+        grade={grade}
       />
 
       <main className="flex flex-1 min-h-0 overflow-hidden">

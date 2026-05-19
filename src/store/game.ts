@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { Flower, GardenLayout } from "@/types/database";
+import type { Grade } from "@/lib/words";
 
 export interface PlacedFlower {
   layoutId: string;
@@ -19,8 +20,9 @@ interface RewardAnimation {
 }
 
 interface GameStore {
-  pollen: number;        // standard seeds (earned every correct spell)
-  waterDrops: number;    // premium currency (earned on first-try correct)
+  pollen: number;
+  waterDrops: number;
+  grade: Grade;
   placedFlowers: PlacedFlower[];
   plantingFlower: Flower | null;
   reward: RewardAnimation | null;
@@ -28,8 +30,10 @@ interface GameStore {
   init: (opts: {
     pollen: number;
     waterDrops: number;
+    grade: Grade;
     layouts: (GardenLayout & { flowers: Flower | null })[];
   }) => void;
+  setGrade: (g: Grade) => void;
   earnPollen: (amount?: number) => void;
   earnWater: (amount?: number) => void;
   showReward: (r: RewardAnimation) => void;
@@ -41,14 +45,16 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set) => ({
   pollen: 0,
   waterDrops: 0,
+  grade: 5,
   placedFlowers: [],
   plantingFlower: null,
   reward: null,
 
-  init: ({ pollen, waterDrops, layouts }) =>
+  init: ({ pollen, waterDrops, grade, layouts }) =>
     set({
       pollen,
       waterDrops,
+      grade,
       placedFlowers: layouts
         .filter((l) => l.flowers)
         .map((l) => ({
@@ -61,6 +67,7 @@ export const useGameStore = create<GameStore>((set) => ({
         })),
     }),
 
+  setGrade: (g) => set({ grade: g }),
   earnPollen: (amount = 1) => set((s) => ({ pollen: s.pollen + amount })),
   earnWater: (amount = 1) => set((s) => ({ waterDrops: s.waterDrops + amount })),
   showReward: (r) => set({ reward: r }),

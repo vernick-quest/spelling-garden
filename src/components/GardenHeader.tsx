@@ -1,13 +1,14 @@
 "use client";
 
-// Header ported from PrepClutch's App.jsx sticky user bar + dropdown pattern.
-// Adapted for Supabase Auth sign-out and Spelling Garden branding.
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useSession } from "./providers";
 import { UserAvatar } from "./UserAvatar";
+import { useGameStore } from "@/store/game";
+import { GRADE_LABELS, type Grade } from "@/lib/words";
+
+const GRADES: Grade[] = [4, 5, 6, 7, 8];
 
 export function GardenHeader() {
   const { profile } = useSession();
@@ -15,7 +16,10 @@ export function GardenHeader() {
   const router = useRouter();
   const supabase = createClient();
 
-  // Close dropdown on outside click — same pattern as PrepClutch
+  const grade = useGameStore((s) => s.grade);
+  const setGrade = useGameStore((s) => s.setGrade);
+
+  // Close dropdown on outside click
   useEffect(() => {
     if (!showDropdown) return;
     const handler = () => setDropdown(false);
@@ -28,6 +32,14 @@ export function GardenHeader() {
     router.push("/login");
   }
 
+  async function handleGradeChange(g: Grade) {
+    setGrade(g);
+    if (profile) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("users").update({ spelling_level: g }).eq("id", profile.id);
+    }
+  }
+
   return (
     <header
       style={{
@@ -35,13 +47,33 @@ export function GardenHeader() {
         background: "#0a1628cc", backdropFilter: "blur(12px)",
         borderBottom: "1px solid #1a3a5c",
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 20px",
+        padding: "8px 20px", gap: 16,
       }}
     >
-      <span style={{ fontFamily: "var(--font-cinzel), Georgia, serif", fontSize: 16, color: "#a78bfa", letterSpacing: "0.05em" }}>
+      <span style={{ fontFamily: "var(--font-cinzel), Georgia, serif", fontSize: 16, color: "#a78bfa", letterSpacing: "0.05em", flexShrink: 0 }}>
         Spelling Garden
       </span>
 
+      {/* Grade selector */}
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-[var(--text-muted)] mr-1">Grade:</span>
+        {GRADES.map((g) => (
+          <button
+            key={g}
+            onClick={() => handleGradeChange(g)}
+            className="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+            style={{
+              background: grade === g ? "#a78bfa33" : "transparent",
+              border: `1px solid ${grade === g ? "#a78bfa" : "#1a3a5c"}`,
+              color: grade === g ? "#a78bfa" : "#64748b",
+            }}
+          >
+            {g}th
+          </button>
+        ))}
+      </div>
+
+      {/* User menu */}
       {profile ? (
         <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
           <button
@@ -59,7 +91,10 @@ export function GardenHeader() {
               boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
             }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 }}>{profile.name}</div>
-              <div style={{ fontSize: 12, color: "#475569", marginBottom: 14 }}>{profile.email}</div>
+              <div style={{ fontSize: 12, color: "#475569", marginBottom: 6 }}>{profile.email}</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
+                {GRADE_LABELS[grade]} words active
+              </div>
               <button
                 onClick={handleSignOut}
                 style={{

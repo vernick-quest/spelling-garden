@@ -2,6 +2,16 @@
 
 import { useGameStore } from "@/store/game";
 import type { Flower } from "@/types/database";
+import type { Grade } from "@/lib/words";
+
+// Flowers available by grade tier — matches min_grade column in DB
+const GRADE_RARITY: Record<Grade, string[]> = {
+  4: ["common"],
+  5: ["common", "uncommon"],
+  6: ["common", "uncommon", "rare"],
+  7: ["common", "uncommon", "rare", "shimmer"],
+  8: ["common", "uncommon", "rare", "shimmer", "mythic"],
+};
 
 interface Props {
   flowers: Flower[];
@@ -33,9 +43,14 @@ export function AlchemistGreenhouse({ flowers }: Props) {
   const waterDrops = useGameStore((s) => s.waterDrops);
   const plantingFlower = useGameStore((s) => s.plantingFlower);
   const selectPlanting = useGameStore((s) => s.selectPlanting);
+  const grade = useGameStore((s) => s.grade);
 
-  const affordable = flowers.filter((f) => !f.recipe && pollen >= f.base_seed_cost.standard);
-  const locked = flowers.filter((f) => !f.recipe && pollen < f.base_seed_cost.standard);
+  const allowedRarities = GRADE_RARITY[grade];
+  const gradeFlowers = flowers.filter((f) => !f.recipe && allowedRarities.includes(f.rarity));
+  const lockedByGrade = flowers.filter((f) => !f.recipe && !allowedRarities.includes(f.rarity));
+
+  const affordable = gradeFlowers.filter((f) => pollen >= f.base_seed_cost.standard);
+  const locked = gradeFlowers.filter((f) => pollen < f.base_seed_cost.standard);
 
   return (
     <div className="flex flex-col h-full p-4 gap-4">
@@ -87,17 +102,19 @@ export function AlchemistGreenhouse({ flowers }: Props) {
         ) : (
           <>
             {affordable.map((f) => (
-              <FlowerCard
-                key={f.id}
-                flower={f}
-                canAfford
-                isPlanting={plantingFlower?.id === f.id}
-                onPlant={() => selectPlanting(plantingFlower?.id === f.id ? null : f)}
-              />
+              <FlowerCard key={f.id} flower={f} canAfford isPlanting={plantingFlower?.id === f.id}
+                onPlant={() => selectPlanting(plantingFlower?.id === f.id ? null : f)} />
             ))}
             {locked.map((f) => (
               <FlowerCard key={f.id} flower={f} canAfford={false} isPlanting={false} onPlant={() => {}} />
             ))}
+            {lockedByGrade.length > 0 && (
+              <div className="rounded-lg border border-dashed border-[var(--panel-border)] p-2.5 text-center">
+                <p className="text-xs text-[var(--text-muted)]">
+                  🔒 {lockedByGrade.length} rarer flower{lockedByGrade.length > 1 ? "s" : ""} unlock at higher grades
+                </p>
+              </div>
+            )}
           </>
         )}
       </section>
