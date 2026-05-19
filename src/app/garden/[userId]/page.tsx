@@ -42,7 +42,7 @@ export default async function VisitorGardenPage({ params }: Props) {
 
       <div className="flex-1 min-h-0">
         <GardenCanvas
-          layouts={(layouts as LayoutWithFlower[]) ?? []}
+          initialLayouts={(layouts as LayoutWithFlower[]) ?? []}
           userId={userId}
           readOnly
           visitorId={visitor?.id}

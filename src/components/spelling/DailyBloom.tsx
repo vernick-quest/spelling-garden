@@ -1,87 +1,149 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { speakWord } from "@/lib/elevenlabs/tts";
 import { createClient } from "@/lib/supabase/client";
+import { useGameStore } from "@/store/game";
 
 interface Props {
   userId: string;
 }
 
-const SAMPLE_WORDS = ["necessary", "beautiful", "definitely", "separate", "occurrence"];
+const WORD_LIST = [
+  "necessary", "beautiful", "definitely", "separate", "occurrence",
+  "accommodate", "achieve", "conscience", "correspond", "environment",
+  "February", "foreign", "government", "guarantee", "immediately",
+  "knowledge", "lightning", "maintenance", "mischievous", "occasion",
+  "parliament", "privilege", "recommend", "rhythm", "sincerely",
+  "tomorrow", "vocabulary", "Wednesday", "threshold", "prejudice",
+];
 
 export function DailyBloom({ userId }: Props) {
   const supabase = createClient();
   const [wordIndex, setWordIndex] = useState(0);
   const [input, setInput] = useState("");
-  const [outcome, setOutcome] = useState<"idle" | "correct" | "incorrect">("idle");
+  const [shake, setShake] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const currentWord = SAMPLE_WORDS[wordIndex % SAMPLE_WORDS.length];
+  const { earnPollen, earnWater, showReward, clearReward, reward } = useGameStore();
+  const currentWord = WORD_LIST[wordIndex % WORD_LIST.length];
+
+  // Auto-play word whenever it changes
+  useEffect(() => {
+    const timer = setTimeout(() => speakWord(currentWord), 600);
+    return () => clearTimeout(timer);
+  }, [wordIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
+    if (!input.trim()) return;
     const isCorrect = input.trim().toLowerCase() === currentWord.toLowerCase();
     const isFirstTry = attempts === 0;
-    setAttempts((a) => a + 1);
 
     if (isCorrect) {
-      setOutcome("correct");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from("spelling_progress") as any).upsert({
-        user_id: userId,
-        word: currentWord,
-        word_list: "grade5-week1",
-        attempts: attempts + 1,
-        correct_first_try_count: isFirstTry ? 1 : 0,
-        mastery_level: isFirstTry ? 2 : 1,
-        last_practiced_at: new Date().toISOString(),
-      }, { onConflict: "user_id,word" });
+      const db = supabase as any;
+      if (isFirstTry) {
+        earnPollen(1);
+        earnWater(1);
+        showReward({ text: "Flawless! Shimmer seed earned!", emoji: "✨", shimmer: true });
+        await db.from("inventory").update({
+          pollen: useGameStore.getState().pollen,
+          water_drops: useGameStore.getState().waterDrops,
+        }).eq("user_id", userId);
+      } else {
+        earnPollen(1);
+        showReward({ text: "Well done! Seed earned!", emoji: "🌱", shimmer: false });
+        await db.from("inventory").update({
+          pollen: useGameStore.getState().pollen,
+        }).eq("user_id", userId);
+      }
+
+      await db.from("spelling_progress").upsert(
+        { user_id: userId, word: currentWord, word_list: "grade5", attempts: attempts + 1,
+          correct_first_try_count: isFirstTry ? 1 : 0, mastery_level: isFirstTry ? 3 : 2,
+          last_practiced_at: new Date().toISOString() },
+        { onConflict: "user_id,word" }
+      );
+
+      setTimeout(clearReward, 2000);
       setTimeout(() => {
         setWordIndex((i) => i + 1);
         setInput("");
-        setOutcome("idle");
         setAttempts(0);
-      }, 1200);
+        inputRef.current?.focus();
+      }, 1800);
+
     } else {
-      setOutcome("incorrect");
+      setAttempts((a) => a + 1);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      // Re-play the word so they can try again
+      setTimeout(() => speakWord(currentWord), 300);
     }
   }
 
-  const borderColor =
-    outcome === "correct"
+  const borderColor = shake
+    ? "border-red-500"
+    : input && input.toLowerCase() === currentWord.toLowerCase().slice(0, input.length)
       ? "border-[var(--accent-green)]"
-      : outcome === "incorrect"
-        ? "border-red-500"
-        : "border-[var(--panel-border)]";
+      : "border-[var(--panel-border)]";
 
   return (
-    <div className="border-t border-[var(--panel-border)] bg-[var(--panel-bg)] px-6 py-4">
+    <div className="relative border-t border-[var(--panel-border)] bg-[var(--panel-bg)] px-6 py-4">
+
+      {/* Reward animation overlay */}
+      {reward && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+          style={{ animation: "rewardFadeUp 2s ease-out forwards" }}
+        >
+          <div className={`flex flex-col items-center gap-1 rounded-2xl px-8 py-4 ${reward.shimmer ? "bg-violet-900/80 border border-violet-400" : "bg-emerald-900/80 border border-emerald-400"}`}>
+            <span style={{ fontSize: 40 }}>{reward.emoji}</span>
+            <span className={`text-sm font-bold ${reward.shimmer ? "text-violet-200" : "text-emerald-200"}`}>
+              {reward.text}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-6 max-w-2xl mx-auto">
+
+        {/* Attempt indicator */}
         <div className="text-center shrink-0">
-          <div className="w-12 h-12 rounded-full border-2 border-[var(--accent-shimmer)] flex items-center justify-center text-xl">
-            🎵
+          <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center text-xl transition-colors ${attempts === 0 ? "border-[var(--accent-shimmer)]" : "border-amber-500"}`}>
+            {attempts === 0 ? "🌟" : "🔄"}
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-1">
-            {attempts === 0 ? "First try!" : `Attempt ${attempts}`}
+            {attempts === 0 ? "First try!" : `Try ${attempts + 1}`}
           </p>
         </div>
 
+        {/* Spelling input */}
         <div className="flex-1">
           <p className="text-xs text-[var(--accent-gold)] font-semibold uppercase tracking-widest mb-2">
-            Daily Bloom
+            Daily Bloom — Spell the word you hear
           </p>
           <div className="flex gap-2 mb-2">
             <input
+              ref={inputRef}
               type="text"
               value={input}
-              onChange={(e) => { setInput(e.target.value); setOutcome("idle"); }}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder="Spell the word..."
+              placeholder="Type here and press Enter..."
               className={`flex-1 rounded-lg border ${borderColor} bg-transparent px-4 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent-shimmer)] transition-colors`}
+              style={{ animation: shake ? "shake 0.4s ease-in-out" : undefined }}
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
             />
+            <button
+              onClick={handleSubmit}
+              className="rounded-lg bg-[var(--accent-shimmer)]/20 border border-[var(--accent-shimmer)] px-4 py-2 text-sm text-[var(--accent-shimmer)] hover:bg-[var(--accent-shimmer)]/30 transition-colors"
+            >
+              Check
+            </button>
           </div>
           <div className="flex gap-2">
             <button
@@ -91,7 +153,7 @@ export function DailyBloom({ userId }: Props) {
               🔊 Read Aloud
             </button>
             <button
-              onClick={() => speakWord(`Use ${currentWord} in a sentence.`)}
+              onClick={() => speakWord(`Here is ${currentWord} in a sentence.`)}
               className="flex items-center gap-1.5 rounded-full bg-emerald-900/50 border border-emerald-700 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-800/50 transition-colors"
             >
               ▶ Play Sentence
@@ -99,14 +161,22 @@ export function DailyBloom({ userId }: Props) {
           </div>
         </div>
 
-        <div className="text-center shrink-0">
-          <p className="text-xs text-[var(--text-muted)] mb-1">Seed Energy Earned</p>
-          <div className="flex gap-2 justify-center text-2xl">
-            <span title="Water drops">💧</span>
-            <span title="Standard seed">🌱</span>
-          </div>
+        {/* Live currency display */}
+        <div className="text-center shrink-0 flex flex-col gap-2">
+          <CurrencyBadge emoji="🌿" label="Pollen" value={useGameStore.getState().pollen} />
+          <CurrencyBadge emoji="💧" label="Drops" value={useGameStore.getState().waterDrops} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function CurrencyBadge({ emoji, label, value }: { emoji: string; label: string; value: number }) {
+  const live = useGameStore((s) => label === "Pollen" ? s.pollen : s.waterDrops);
+  return (
+    <div className="flex items-center gap-1.5 rounded-full border border-[var(--panel-border)] bg-[var(--garden-bg)] px-3 py-1">
+      <span>{emoji}</span>
+      <span className="text-sm font-bold text-[var(--text-primary)]">{live}</span>
     </div>
   );
 }
