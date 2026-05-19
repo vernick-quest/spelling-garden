@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  --garden-bg: #0a1628;
+  --panel-bg: #0d1f3c;
+  --panel-border: #1a3a5c;
+  --accent-shimmer: #a78bfa;
+  --accent-gold: #f59e0b;
+  --accent-green: #34d399;
+  --text-primary: #e2e8f0;
+  --text-muted: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--garden-bg);
+  color: var(--text-primary);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-cinzel), Georgia, serif;
+}
