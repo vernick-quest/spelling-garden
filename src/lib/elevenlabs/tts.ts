@@ -7,11 +7,7 @@ export interface TTSOptions {
 }
 
 export async function speakWord(word: string, options: TTSOptions = {}): Promise<void> {
-  const isMock =
-    process.env.NODE_ENV !== "production" ||
-    !process.env.NEXT_PUBLIC_ELEVENLABS_CONFIGURED;
-
-  if (isMock) {
+  if (process.env.NODE_ENV !== "production") {
     mockSpeak(word);
     return;
   }
