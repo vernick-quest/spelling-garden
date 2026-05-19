@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
-const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Rachel — clear, neutral
+const DEFAULT_VOICE_ID = "qSeXEcewz7tA0Q0qk9fH"; // Victoria
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
